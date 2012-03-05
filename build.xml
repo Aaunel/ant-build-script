@@ -173,30 +173,7 @@
     </target>
 
     <target name="clean" depends="-clean"/>
-	
-	<!-- LESS target, run separately -->
-    <target name="compileless">
-      <echo>Compile LESS to CSS</echo>
-      <apply dir="${dir.source}/${dir.less}" executable="java" parallel="false" failonerror="true">
-          <fileset dir="${dir.source}/${dir.less}" includes="style.less"/>
-          <arg value="-jar" />
-          <arg path="./${dir.build.tools}/${tool.rhino}" />
-          <arg path="./${dir.build.tools}/${tool.lessrhino}" />
-          <srcfile/>
-          <arg value="../${dir.source}/${dir.less}/style.less.css" />
-      </apply>
-      <echo message="Minifying css..."/>
-      <apply dir="${dir.source}/${dir.less}" executable="java" parallel="false">
-          <fileset dir="${dir.source}/${dir.less}" includes="style.less.css"/>
-          <arg line="-jar"/>
-          <arg path="${dir.build.tools}/${tool.yuicompressor}"/>
-          <srcfile/>
-          <arg line="-o"/>
-          <mapper type="merge" to="../${dir.source}/${dir.less}/style.less.min.css"/>
-          <targetfile/>
-      </apply>    
-      <delete file="${dir.source}/${dir.less}/style.less.css"/>
-    </target>
+
 
 
     <!-- JSLint target, run separately -->
@@ -380,7 +357,6 @@
                    -js.main.concat,
                    -js.mylibs.concat,
                    -js.scripts.concat,
-				   -less,
                    -css,
                    -manifest,
                    -htmlclean,
@@ -416,7 +392,6 @@
                    -js.main.concat,
                    -js.mylibs.concat,
                    -js.scripts.concat,
-				   -less,
                    -css,
                    -manifest,
                    -htmlcompress,
@@ -497,7 +472,6 @@
               <!-- this is not strictly necessary, but it avoids putting unreferenced files into your server -->
               <exclude name="${dir.js}/**/*.js"/>
               <exclude name="${dir.js.modules}"/>
-			  <exclude name="${dir.less}/**/*.less"/>
               <exclude name="${dir.css}/**/*.css"/>
               <exclude name="${file.manifest}"/>
           </fileset>
@@ -595,7 +569,7 @@
         <fileset dir="${dir.source}/${dir.js}" includes="${file.js.bypass}, **/*.min.js"/>
       </copy>
       <apply executable="java" parallel="false">
-        <fileset dir="${dir.source}/${dir.js}" excludes="${file.js.bypass}, **/*.min.js, **/less.js" includes="**/*.js">
+        <fileset dir="${dir.source}/${dir.js}" excludes="${file.js.bypass}, **/*.min.js" includes="**/*.js">
           <exclude name="${dir.js}/otherscripts-concat.js"/>
           <exclude name="${dir.js}/scripts-concat.js"/>
         </fileset>          
@@ -627,7 +601,7 @@
 
 
   <!-- HTML -->
-  <target name="-usemin" depends="-js.scripts.concat,-less,-css" description="(PRIVATE) Replaces references to non-minified scripts">
+  <target name="-usemin" depends="-js.scripts.concat,-css" description="(PRIVATE) Replaces references to non-minified scripts">
       <echo message="Switching to minified js files..."/>
 
       <!-- Changes to style.css or scripts.js mean that the html must be updated, and it will be.
@@ -702,14 +676,10 @@
 
       <echo message="Updating the HTML with the new css filename: ${style.css}"/>
 
-	  <replaceregexp match="&lt;link rel=['&quot;]?stylesheet/less['&quot;]?\s+href=['&quot;]?(.*)/${file.root.less.stylesheet}(?:\?.*)?['&quot;]?\s*&gt;"
-		replace="&lt;link rel='stylesheet' href='css/${css.sha}.css'&gt;" flags="m">
-		<fileset dir="${dir.intermediate}" includes="${page-files}"/>
-	  </replaceregexp>
-	  <replaceregexp match="&lt;script.*src=['&quot;]?(.*)/less.*.js(?:\?.*)?['&quot;]?\s*&gt;\s*&lt;/script&gt;"
-		replace="" flags="m">
-		<fileset dir="${dir.intermediate}" includes="${page-files}"/>
-	  </replaceregexp>
+      <replaceregexp match="&lt;link(.+)href=['&quot;]?(.*)/${file.root.stylesheet}(?:\?.*)?['&quot;\s]?(.*/?&gt;)"
+        replace="&lt;link\1href='\2/${css.sha}.css'\3" flags="m">
+          <fileset dir="${dir.intermediate}" includes="${page-files}"/>
+      </replaceregexp>
 
   </target>
 
@@ -851,42 +821,7 @@
 
     <!-- CSS -->
 
-    <target name="-less" depends="-mkdirs" description="Convert LESS to CSS then concatenate and Minify any stylesheets">
-
-	<echo message="Converting LESS to CSS..."/>
-        <delete includeemptydirs="true">
-            <fileset dir="${dir.publish}/${dir.css}" includes="**/*.css" defaultexcludes="false"/>
-        </delete>
-        
-        <apply dir="${dir.source}/${dir.less}" executable="java" parallel="false" failonerror="true">
-            <fileset dir="./${dir.source}/">
-                <include name="**/${dir.less}/${file.root.less.stylesheet}"/>
-            </fileset>
-            <arg value="-jar" />
-            <arg path="./${dir.build.tools}/${tool.rhino}" />
-            <arg path="./${dir.build.tools}/${tool.lessrhino}" />
-            <srcfile/>
-            <arg value="${tool.lessrhino.opts}" />
-        </apply>
-
-        <echo message="Minifying css..."/>
-        <apply executable="java" parallel="false">
-            <fileset dir="${dir.intermediate}/${dir.css}/" includes="style.less.css"/>
-            <arg line="-jar"/>
-            <arg path="${dir.build.tools}/${tool.yuicompressor}"/>
-            <srcfile/>
-            <arg line="-o"/>
-            <mapper type="merge" to="${basedir}/${dir.intermediate}/${dir.css}/style.less.min.css"/>
-            <targetfile/>
-        </apply>
-
-        <checksum file="${dir.intermediate}/${dir.css}/style.less.min.css" algorithm="sha" property="css.fullsha" />
-        <propertyregex property="css.sha" input="${css.fullsha}" regexp=".{${hash.length}}" select="\0" />
-        <property name="style.css" value="${dir.css}/${css.sha}.css" />
-        <copy file="${dir.intermediate}/${dir.css}/style.less.min.css" tofile="${dir.publish}/${dir.css}/${css.sha}.css" />
-    </target>
-	
-	<target name="-css-remove-concatenated-stylesheets">
+    <target name="-css-remove-concatenated-stylesheets">
             <echo>Removing ${css_file} from html</echo>
             <replaceregexp match="&lt;link.+href=&quot;.*${css_file}&quot;.*&gt;" replace="  ">
                 <fileset dir="${dir.intermediate}" includes="${page-files}"/>
